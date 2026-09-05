@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AgriSetu — Farm to Home</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['Baloo 2','sans-serif'],
+        sans: ['Inter','sans-serif'],
+        mono: ['JetBrains Mono','monospace']
+      },
+      boxShadow: {
+        glow: '0 0 50px rgba(16,185,129,.14)',
+        soft: '0 16px 50px rgba(15,23,42,.08)'
+      }
+    }
+  }
+}
+</script>
+<script type="importmap">
+{"imports":{
+  "react":"https://esm.sh/react@18.3.1",
+  "react-dom":"https://esm.sh/react-dom@18.3.1",
+  "react-dom/client":"https://esm.sh/react-dom@18.3.1/client",
+  "lucide-react":"https://esm.sh/lucide-react@0.468.0?external=react"
+}}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#f6f8f5;color:#17231b;font-family:Inter,sans-serif}
+button,input,select,textarea{font:inherit}
+.glass{background:rgba(255,255,255,.78);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.mesh{background:
+ radial-gradient(circle at 10% 10%,rgba(16,185,129,.18),transparent 28%),
+ radial-gradient(circle at 90% 20%,rgba(251,191,36,.16),transparent 25%),
+ radial-gradient(circle at 55% 100%,rgba(5,150,105,.12),transparent 30%),
+ #f7faf7}
+.hero-grid{background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:36px 36px}
+.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
+.ticker{animation:ticker 34s linear infinite}.ticker:hover{animation-play-state:paused}
+@keyframes ticker{to{transform:translateX(-50%)}}
+.float{animation:float 5s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-7px)}}
+.fade-up{animation:fadeUp .55s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#cbd5cf;border-radius:10px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-type="module" data-presets="react">
+import React,{useMemo,useState,useEffect} from "react";
+import {createRoot} from "react-dom/client";
+import {
+ Sprout,Wheat,ShoppingBasket,ArrowRight,ShieldCheck,Truck,IndianRupee,
+ TrendingUp,MapPin,Search,Star,Clock,Leaf,Users,ChevronRight,Plus,Minus,
+ Trash2,Menu,X,PackageCheck,WalletCards,BarChart3,LogOut,Phone,CheckCircle2,
+ CircleHelp,Store,Navigation,HeartHandshake,Sun,Filter,ArrowLeft,LocateFixed,Copy,TruckIcon,Camera,Upload,Clock3,AlertTriangle,Sparkles
+} from "lucide-react";
+
+const crops=[
+ {id:"tomato",name:"Tomato",emoji:"🍅",cat:"Vegetable",price:25,qty:100},
+ {id:"onion",name:"Onion",emoji:"🧅",cat:"Vegetable",price:20,qty:80},
+ {id:"potato",name:"Potato",emoji:"🥔",cat:"Vegetable",price:18,qty:200},
+ {id:"mango",name:"Mango",emoji:"🥭",cat:"Fruit",price:45,qty:150},
+ {id:"wheat",name:"Wheat",emoji:"🌾",cat:"Grain",price:23,qty:500},
+ {id:"chana",name:"Chana",emoji:"🫘",cat:"Pulse",price:58,qty:90},
+ {id:"peas",name:"Green Peas",emoji:"🟢",cat:"Vegetable",price:52,qty:60},
+ {id:"grapes",name:"Grapes",emoji:"🍇",cat:"Fruit",price:70,qty:75}
+];
+const farmers=[
+ {id:1,name:"Ramesh Patil",city:"Pune",rating:4.8,verified:true,avatar:"RP",crops:[{...crops[0]},{...crops[1]}]},
+ {id:2,name:"Suresh Yadav",city:"Nashik",rating:4.6,verified:true,avatar:"SY",crops:[{...crops[2]},{...crops[6]}]},
+ {id:3,name:"Lakshmi Reddy",city:"Hyderabad",rating:4.9,verified:true,avatar:"LR",crops:[{...crops[3]}]},
+ {id:4,name:"Gurpreet Singh",city:"Chandigarh",rating:4.7,verified:true,avatar:"GS",crops:[{...crops[4]}]}
+];
+const categories=["All","Vegetable","Fruit","Grain","Pulse"];
+const cityData={
+ "Tier 1":["Delhi","Mumbai","Bengaluru","Chennai","Kolkata","Hyderabad","Pune","Ahmedabad"],
+ "Tier 2":["Jaipur","Lucknow","Kanpur","Nagpur","Indore","Bhopal","Patna","Vadodara","Surat","Coimbatore","Kochi","Chandigarh","Nashik","Agra","Varanasi","Mysuru"],
+ "Tier 3":["Sahjanwa","Gorakhpur","Prayagraj","Meerut","Aligarh","Bareilly","Moradabad","Gwalior","Jodhpur","Udaipur","Raipur","Ranchi","Dehradun","Amritsar","Jalandhar","Siliguri","Guwahati","Hubballi","Mangaluru","Madurai"],
+ "Tier 4":["Basti","Kushinagar","Maharajganj","Sant Kabir Nagar","Sultanpur","Azamgarh","Bahraich","Sitapur","Farrukhabad","Mainpuri","Etah","Hapur","Barabanki","Ayodhya","Chitrakoot","Chandauli","Ballia","Jaunpur","Shahjahanpur","Pilibhit"]
+};
+const allCities=Object.values(cityData).flat();
+const mockOrders=[
+ {id:"KS-10482",items:"Tomato • Onion",amount:420,status:"Out for delivery",eta:"18 min",date:"Today"},
+ {id:"KS-10391",items:"Mango",amount:675,status:"Delivered",eta:"Delivered",date:"Yesterday"},
+ {id:"KS-10276",items:"Wheat • Chana",amount:980,status:"Delivered",eta:"Delivered",date:"28 Aug"}
+];
+const mockSales=[
+ {id:"ORD-7782",buyer:"Amit Sharma",crop:"Tomato",qty:12,amount:300,status:"Payment received"},
+ {id:"ORD-7774",buyer:"Neha Verma",crop:"Onion",qty:20,amount:400,status:"Out for delivery"},
+ {id:"ORD-7761",buyer:"Rahul Singh",crop:"Tomato",qty:8,amount:200,status:"Delivered"}
+];
+
+
+const money=n=>"₹"+Math.round(n).toLocaleString("en-IN");
+
+function App(){
+ const [page,setPage]=useState("home"),[role,setRole]=useState(null),[authMode,setAuthMode]=useState("signup"),[authUser,setAuthUser]=useState(null);
+ const [consumerTab,setConsumerTab]=useState("market"),[farmerTab,setFarmerTab]=useState("overview"),[query,setQuery]=useState(""),[cat,setCat]=useState("All"),[cart,setCart]=useState([]),[modal,setModal]=useState(false);
+ const [sharedListings,setSharedListings]=useState(()=>{
+   try{const saved=JSON.parse(localStorage.getItem("fasalfresh_listings"));if(Array.isArray(saved)&&saved.length)return saved}catch(e){}
+   return farmers.flatMap(f=>f.crops.map(c=>({...c,farmer:f})));
+ });
+ const [orders,setOrders]=useState(()=>{try{return JSON.parse(localStorage.getItem("fasalfresh_orders"))||[]}catch(e){return []}});
+ const [notifications,setNotifications]=useState(()=>{try{return JSON.parse(localStorage.getItem("fasalfresh_notifications"))||[]}catch(e){return []}});
+ useEffect(()=>{localStorage.setItem("fasalfresh_listings",JSON.stringify(sharedListings))},[sharedListings]);
+ useEffect(()=>{localStorage.setItem("fasalfresh_orders",JSON.stringify(orders))},[orders]);
+ useEffect(()=>{localStorage.setItem("fasalfresh_notifications",JSON.stringify(notifications))},[notifications]);
+ const listings=sharedListings;
+ const filtered=listings.filter(x=>(cat==="All"||x.cat===cat)&&x.name.toLowerCase().includes(query.toLowerCase()));
+ const openRole=r=>{setRole(r);setAuthMode("signup");setPage("auth")};
+ const addToCart=item=>setCart(c=>{const found=c.find(x=>x.key===item.farmer.id+"-"+item.id);if(found)return c.map(x=>x.key===found.key?{...x,count:x.count+1}:x);return [...c,{...item,key:item.farmer.id+"-"+item.id,count:1}]});
+  const updateCartQty=(key,delta)=>setCart(c=>c.map(x=>x.key===key?{...x,count:Math.max(0,x.count+delta)}:x).filter(x=>x.count>0));
+  const removeFromCart=key=>setCart(c=>c.filter(x=>x.key!==key));
+ const total=cart.reduce((sum,x)=>sum+x.price*x.count,0);
+ const notify=(text,orderId)=>setNotifications(n=>[{id:Date.now()+Math.random(),text,orderId,roles:["consumer","farmer"],read:false},...n].slice(0,30));
+ const placeOrder=()=>{if(!cart.length)return;const base="KS-"+Math.floor(10000+Math.random()*89999);const grouped={};cart.forEach(x=>(grouped[x.farmer.id]??=[]).push(x));const created=Object.entries(grouped).map(([farmerId,items],i)=>{const id=i?base+"-"+i:base;return{id,items:items.map(x=>x.name+" • "+x.count+" kg").join(" • "),amount:items.reduce((a,x)=>a+x.price*x.count,0)+(i===0?30:0),status:"Order placed",eta:"Preparing",date:"Today",farmerId,trackingId:"FFRESH-TRK-"+id.slice(3),itemsData:items}});setOrders(o=>[...created,...o]);created.forEach(o=>notify("Order "+o.id+" placed successfully",o.id));setCart([]);setModal(false)};
+ return <div className="min-h-screen">
+  {page==="home"&&<Home onRole={openRole}/>}
+  {page==="auth"&&<Auth role={role} mode={authMode} setMode={setAuthMode} onBack={()=>setPage("home")} onSuccess={u=>{setAuthUser(u);setPage("dashboard")}}/>}
+  {page==="dashboard"&&role==="consumer"&&<Consumer user={authUser} filtered={filtered} query={query} setQuery={setQuery} cat={cat} setCat={setCat} addToCart={addToCart} updateCartQty={updateCartQty} removeFromCart={removeFromCart} cart={cart} total={total} onCheckout={()=>setModal(true)} tab={consumerTab} setTab={setConsumerTab} orders={orders} notifications={notifications} setNotifications={setNotifications} onBack={()=>setPage("home")}/>}
+  {page==="dashboard"&&role==="farmer"&&<Farmer user={authUser} tab={farmerTab} setTab={setFarmerTab} onBack={()=>setPage("home")} onLogout={()=>{setRole(null);setPage("home")}} sharedListings={sharedListings} setSharedListings={setSharedListings} orders={orders} setOrders={setOrders} notifications={notifications} setNotifications={setNotifications}/>} 
+  {modal&&<Checkout cart={cart} total={total} close={()=>setModal(false)} done={placeOrder}/>} 
+ </div>
+}
+
+function TopBar(){
+ return <div className="bg-[#102218] text-white overflow-hidden">
+  <div className="max-w-7xl mx-auto flex items-center gap-5 px-5 py-2.5">
+   <div className="shrink-0 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-300">
+    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/> Live Mandi
+   </div>
+   <div className="overflow-hidden whitespace-nowrap flex-1">
+    <div className="ticker inline-flex min-w-max gap-10 text-xs text-slate-300">
+     {["Tomato ₹25/kg ↑2.4%","Onion ₹20/kg ↑1.1%","Potato ₹18/kg ↓0.8%","Mango ₹45/kg ↑4.2%","Wheat ₹23/kg ↑1.6%","Chana ₹58/kg ↑2.8%","Green Peas ₹52/kg ↑3.1%","Grapes ₹70/kg ↑5.0%",
+       "Tomato ₹25/kg ↑2.4%","Onion ₹20/kg ↑1.1%","Potato ₹18/kg ↓0.8%","Mango ₹45/kg ↑4.2%"].map((x,i)=><span key={i}>{x}</span>)}
+    </div>
+   </div>
+  </div>
+ </div>
+}
+
+function Brand(){
+ return <div className="flex items-center gap-3">
+   <div className="w-11 h-11 rounded-2xl bg-emerald-700 text-white grid place-items-center shadow-lg shadow-emerald-700/20">
+    <Sprout size={23}/>
+   </div>
+   <div><div className="font-display font-extrabold text-xl leading-none">AgriSetu</div>
+   <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-[.2em] mt-1">Farm • Fair • Fresh</div></div>
+ </div>
+}
+
+function Home({onRole}){
+ return <div className="mesh min-h-screen">
+  <TopBar/>
+  <header className="max-w-7xl mx-auto px-5 py-5 flex items-center justify-between">
+   <Brand/>
+   <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+    <a href="#how" className="hover:text-emerald-700">How it works</a><a href="#impact" className="hover:text-emerald-700">Our impact</a><a href="#trust" className="hover:text-emerald-700">Why FasalFresh</a>
+   </nav>
+   <button onClick={()=>onRole("consumer")} className="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-bold hover:bg-emerald-800 transition">Open Marketplace</button>
+  </header>
+
+  <main>
+   <section className="max-w-7xl mx-auto px-5 pt-10 pb-20 lg:pt-16">
+    <div className="grid lg:grid-cols-[1.08fr_.92fr] gap-12 items-center">
+     <div className="fade-up">
+      <div className="inline-flex items-center gap-2 bg-white border border-emerald-100 rounded-full px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-sm">
+       <Leaf size={14}/> India’s direct farm-to-home marketplace
+      </div>
+      <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[.94] tracking-tight text-slate-900 mt-6">
+       Fresh from the <span className="text-emerald-700">farm.</span><br/>
+       Fair for the <span className="text-amber-500">farmer.</span>
+      </h1>
+      <p className="text-lg text-slate-600 max-w-xl mt-6 leading-8">Buy produce directly from verified farmers. Better prices for farmers, fresher food for families, and zero unnecessary middlemen.</p>
+      <div className="flex flex-col sm:flex-row gap-3 mt-8">
+       <button onClick={()=>onRole("consumer")} className="group bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl px-6 py-4 font-extrabold flex items-center justify-center gap-3 shadow-xl shadow-emerald-700/20">
+        <ShoppingBasket size={19}/> Shop Fresh Produce <ArrowRight size={18} className="group-hover:translate-x-1 transition"/>
+       </button>
+       <button onClick={()=>onRole("farmer")} className="bg-white hover:bg-emerald-50 border border-slate-200 text-slate-800 rounded-2xl px-6 py-4 font-extrabold flex items-center justify-center gap-3">
+        <Wheat size={19}/> Sell My Produce
+       </button>
+      </div>
+      <div className="flex flex-wrap gap-x-7 gap-y-3 mt-8 text-sm text-slate-500">
+       <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-600"/> Verified farmers</span>
+       <span className="flex items-center gap-2"><Truck size={16} className="text-emerald-600"/> Distance-based delivery</span>
+       <span className="flex items-center gap-2"><WalletCards size={16} className="text-emerald-600"/> Transparent pricing</span>
+      </div>
+     </div>
+
+     <div className="relative">
+      <div className="absolute -inset-6 bg-emerald-200/30 blur-3xl rounded-full"/>
+      <div className="relative rounded-[2rem] overflow-hidden bg-[#12301f] text-white p-6 sm:p-8 shadow-2xl shadow-emerald-900/20 hero-grid">
+       <div className="flex items-center justify-between mb-8">
+        <div><p className="text-emerald-200 text-xs font-bold uppercase tracking-widest">Today’s farm board</p><h3 className="font-display text-2xl font-bold mt-1">What’s fresh nearby</h3></div>
+        <div className="w-10 h-10 rounded-xl bg-white/10 grid place-items-center"><Sun size={19} className="text-amber-300"/></div>
+       </div>
+       <div className="space-y-3">
+        {[["🍅","Tomatoes","₹25","Pune","2.4 km"],["🧅","Onions","₹20","Nashik","5.8 km"],["🥭","Mangoes","₹45","Hyderabad","8.1 km"]].map((x,i)=>
+         <div key={i} className="bg-white/10 border border-white/10 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-white/10 grid place-items-center text-2xl">{x[0]}</div>
+          <div className="flex-1"><p className="font-bold">{x[1]}</p><p className="text-xs text-emerald-200 mt-0.5">{x[3]} • {x[4]}</p></div>
+          <div className="text-right"><p className="font-mono font-bold text-amber-300">{x[2]}<span className="text-[10px] text-white/50">/kg</span></p><p className="text-[10px] text-emerald-200">Direct price</p></div>
+         </div>)}
+       </div>
+       <div className="mt-5 grid grid-cols-3 gap-2">
+        {[["35%","+","Farmer earnings"],["20%","~","Customer savings"],["4.8","★","Avg rating"]].map((x,i)=><div key={i} className="rounded-xl bg-black/15 border border-white/10 p-3"><p className="font-mono font-bold text-lg">{x[0]}<span className="text-amber-300">{x[1]}</span></p><p className="text-[9px] text-emerald-100">{x[2]}</p></div>)}
+       </div>
+      </div>
+      <div className="float absolute -bottom-6 -left-5 bg-white rounded-2xl shadow-soft border border-slate-100 p-3 flex items-center gap-3">
+       <div className="w-10 h-10 rounded-xl bg-amber-100 grid place-items-center text-xl">🌱</div><div><p className="text-xs font-extrabold">Harvested fresh</p><p className="text-[10px] text-slate-500">Straight from the field</p></div>
+      </div>
+     </div>
+    </div>
+   </section>
+
+   <section id="impact" className="bg-white border-y border-slate-100">
+    <div className="max-w-7xl mx-auto px-5 py-14 grid md:grid-cols-4 gap-4">
+     {[
+      [Users,"1,200+","Farmer network"],[IndianRupee,"₹48L+","Value traded"],[PackageCheck,"98%","Orders delivered"],[HeartHandshake,"4.8/5","Community trust"]
+     ].map(([Icon,val,label],i)=><div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"><Icon size={20} className="text-emerald-700"/><p className="font-display text-3xl font-extrabold mt-3">{val}</p><p className="text-xs text-slate-500 mt-1">{label}</p></div>)}
+    </div>
+   </section>
+
+   <section id="how" className="max-w-7xl mx-auto px-5 py-20">
+    <div className="text-center max-w-2xl mx-auto"><p className="text-xs uppercase tracking-[.2em] font-extrabold text-emerald-700">Simple by design</p><h2 className="font-display text-4xl font-extrabold mt-2">From field to doorstep in 3 steps</h2></div>
+    <div className="grid md:grid-cols-3 gap-5 mt-10">
+     {[["01","Farmer lists","Farmers add their crop, quantity and fair price.","🌾"],["02","You choose","Compare nearby produce, price, rating and delivery time.","🛒"],["03","Fresh arrives","Place the order and coordinate delivery directly.","🚜"]].map((x,i)=><div key={i} className="bg-white rounded-3xl border border-slate-100 p-7 shadow-sm"><div className="flex justify-between items-start"><span className="font-mono text-xs text-emerald-700">{x[0]}</span><span className="text-3xl">{x[3]}</span></div><h3 className="font-display text-2xl font-bold mt-7">{x[1]}</h3><p className="text-sm text-slate-500 leading-6 mt-2">{x[2]}</p></div>)}
+    </div>
+   </section>
+
+   <section id="trust" className="bg-[#102218] text-white">
+    <div className="max-w-7xl mx-auto px-5 py-14 flex flex-col md:flex-row md:items-center justify-between gap-7">
+     <div><p className="text-emerald-300 text-xs font-bold uppercase tracking-[.2em]">Built around trust</p><h2 className="font-display text-3xl font-extrabold mt-2">A cleaner food supply chain.</h2><p className="text-slate-300 text-sm mt-2 max-w-xl">Verified profiles, transparent pricing and distance-aware delivery keep both sides informed before every order.</p></div>
+     <button onClick={()=>onRole("consumer")} className="shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-2xl px-6 py-3.5 font-extrabold flex items-center gap-2">Explore marketplace <ArrowRight size={18}/></button>
+    </div>
+   </section>
+  </main>
+  <footer className="bg-[#0b1710] text-slate-400 text-xs"><div className="max-w-7xl mx-auto px-5 py-6 flex flex-col sm:flex-row justify-between gap-2"><span>© 2026 FasalFresh</span><span>Direct Farm • Fair Price • Fresh Food</span></div></footer>
+ </div>
+}
+
+
+function Auth({role,mode,setMode,onBack,onSuccess}){
+ const [step,setStep]=useState("phone");
+ const [phone,setPhone]=useState("");
+ const [otp,setOtp]=useState("");
+ const [demoOtp,setDemoOtp]=useState("");
+ const [name,setName]=useState("");
+ const [city,setCity]=useState("Pune");
+ const [address,setAddress]=useState("");
+ const [aadhaar,setAadhaar]=useState("");
+ const [kycVerified,setKycVerified]=useState(false);
+ const [error,setError]=useState("");
+ const [loading,setLoading]=useState(false);
+
+ const verifyKyc=()=>{
+   const digits=aadhaar.replace(/\D/g,"");
+   if(digits.length!==12){setError("Enter a valid 12-digit Aadhaar number.");return}
+   setKycVerified(true);setError("");
+ };
+
+ const sendOtp=()=>{
+   if(phone.length!==10){setError("Enter a valid 10-digit mobile number.");return}
+   const code=String(Math.floor(1000+Math.random()*9000));
+   setDemoOtp(code);setOtp("");setError("");setLoading(true);
+   setTimeout(()=>{setLoading(false);setStep("otp")},650);
+ };
+
+ const verify=()=>{
+   if(otp!==demoOtp){setError("Invalid OTP. Please try again.");return}
+   setError("");
+   if(mode==="login"){
+     try{
+       const accounts=JSON.parse(localStorage.getItem("fasalfresh_accounts")||"{}");
+       const saved=accounts[role]?.[phone];
+       if(saved){onSuccess(saved);return}
+     }catch(e){}
+     setError("No account found for this mobile number. Please sign up first.");
+     return;
+   }
+   setStep("details");
+ };
+
+ const finish=()=>{
+   if(!name.trim()||!address.trim()){setError("Please complete your profile.");return}
+    if(role==="farmer"&&!kycVerified){setError("Please verify your 12-digit Aadhaar for farmer KYC.");return}
+   const user={name:name.trim(),phone,city,address,role,kycVerified:role==="farmer"};
+   try{
+     const accounts=JSON.parse(localStorage.getItem("fasalfresh_accounts")||"{}");
+     accounts[role]=accounts[role]||{};
+     accounts[role][phone]=user;
+     localStorage.setItem("fasalfresh_accounts",JSON.stringify(accounts));
+   }catch(e){}
+   onSuccess(user);
+ };
+
+ return <div className="min-h-screen bg-[#f6f8f5]">
+   <div className="max-w-6xl mx-auto min-h-screen grid lg:grid-cols-2">
+    <div className="hidden lg:flex bg-[#102218] text-white p-12 flex-col justify-between relative overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-emerald-500/20 blur-3xl"/>
+      <div><Brand/><div className="mt-20 max-w-md"><p className="text-xs uppercase tracking-[.2em] text-emerald-300 font-bold">{role==="farmer"?"Farmer access":"Consumer access"}</p><h1 className="font-display text-5xl font-extrabold leading-tight mt-3">One account.<br/>A better food chain.</h1><p className="text-slate-300 mt-5 leading-7">Secure phone verification keeps your FasalFresh account simple and trusted.</p></div></div>
+      <div className="grid grid-cols-3 gap-3">
+       {[["🔐","OTP secure"],["🌾","Direct farms"],["🤝","Trusted network"]].map((x,i)=><div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="text-xl">{x[0]}</div><p className="text-[10px] text-slate-300 mt-2">{x[1]}</p></div>)}
+      </div>
+    </div>
+
+    <div className="flex items-center justify-center p-5 sm:p-10">
+      <div className="w-full max-w-md">
+       <button onClick={onBack} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-700 mb-7">← Back to home</button>
+       <div className="lg:hidden mb-7"><Brand/></div>
+
+       <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-5">
+         <div className={"w-12 h-12 rounded-2xl grid place-items-center text-white "+(role==="farmer"?"bg-emerald-700":"bg-amber-500")}>{role==="farmer"?<Wheat/>:<ShoppingBasket/>}</div>
+         <div><p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{role==="farmer"?"Farmer":"Consumer"}</p><h2 className="font-display text-2xl font-extrabold">{mode==="signup"?"Create account":"Welcome back"}</h2></div>
+        </div>
+
+        {step==="phone"&&<>
+         <div className="grid grid-cols-2 gap-1 bg-slate-100 rounded-xl p-1 mb-6">
+          <button onClick={()=>{setMode("signup");setError("")}} className={"py-2.5 rounded-lg text-xs font-extrabold "+(mode==="signup"?"bg-white shadow-sm text-emerald-700":"text-slate-500")}>Sign up</button>
+          <button onClick={()=>{setMode("login");setError("")}} className={"py-2.5 rounded-lg text-xs font-extrabold "+(mode==="login"?"bg-white shadow-sm text-emerald-700":"text-slate-500")}>Login</button>
+         </div>
+         <p className="text-sm text-slate-500 leading-6 mb-5">{mode==="signup"?"Enter your mobile number to create a new FasalFresh account.":"Login securely using your registered mobile number."}</p>
+         <label className="text-xs font-bold text-slate-600">Mobile number</label>
+         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 mt-2 focus-within:border-emerald-500">
+          <span className="text-sm font-bold text-slate-400">+91</span><Phone size={15} className="text-slate-400"/><input autoFocus value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10-digit mobile number" className="w-full py-3.5 bg-transparent outline-none text-sm"/>
+         </div>
+         {error&&<p className="text-xs text-rose-600 mt-2">{error}</p>}
+         <button onClick={sendOtp} disabled={loading} className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-xl py-3.5 font-extrabold text-sm flex justify-center items-center gap-2">{loading?"Sending OTP…":"Send OTP"}<ArrowRight size={16}/></button>
+         <p className="text-[10px] text-center text-slate-400 mt-4">By continuing, you agree to FasalFresh's terms.</p>
+        </>}
+
+        {step==="otp"&&<>
+         <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-5"><div className="flex gap-3"><ShieldCheck className="text-emerald-700 shrink-0"/><div><p className="text-xs font-extrabold text-emerald-900">OTP sent successfully</p><p className="text-[11px] text-emerald-700 mt-1">Enter the 4-digit code sent to +91 {phone}.</p></div></div></div>
+         <label className="text-xs font-bold text-slate-600">Verification code</label>
+         <input autoFocus value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,4))} maxLength="4" placeholder="••••" className="w-full mt-2 text-center tracking-[.6em] font-mono text-2xl bg-slate-50 border border-slate-200 rounded-xl py-4 outline-none focus:border-emerald-500"/>
+         <div className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 mt-3 text-[11px] text-amber-800">Demo OTP: <b className="font-mono">{demoOtp}</b></div>
+         {error&&<p className="text-xs text-rose-600 mt-2">{error}</p>}
+         <button onClick={verify} className="w-full mt-4 bg-emerald-700 text-white rounded-xl py-3.5 font-extrabold text-sm">Verify & Continue</button>
+         <button onClick={sendOtp} className="w-full mt-3 text-xs font-bold text-slate-500 hover:text-emerald-700">↻ Resend OTP</button>
+         <button onClick={()=>{setStep("phone");setError("")}} className="w-full mt-2 text-xs text-slate-400">Change number</button>
+        </>}
+
+        {step==="details"&&<>
+         <div className="flex items-center gap-2 text-xs text-emerald-700 font-bold mb-5"><CheckCircle2 size={15}/> Phone verified</div>
+         <div className="space-y-3">
+          <div><label className="text-xs font-bold text-slate-600">Full name</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name" className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-emerald-500"/></div>
+          <div><label className="text-xs font-bold text-slate-600">Nearest city</label><select value={city} onChange={e=>setCity(e.target.value)} className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none"><option>Pune</option><option>Nashik</option><option>Mumbai</option><option>Delhi</option><option>Lucknow</option><option>Hyderabad</option></select></div>
+          <div><label className="text-xs font-bold text-slate-600">Full address</label><textarea value={address} onChange={e=>setAddress(e.target.value)} rows="3" placeholder="House / village / street / landmark" className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none resize-none focus:border-emerald-500"/></div>
+           {role==="farmer"&&<div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><div className="flex items-center justify-between"><div><p className="text-xs font-extrabold text-emerald-900">Farmer KYC — Aadhaar</p><p className="text-[10px] text-emerald-700 mt-1">Required for verified farmer status</p></div>{kycVerified&&<CheckCircle2 size={19} className="text-emerald-700"/>}</div><div className="flex gap-2 mt-3"><input value={aadhaar} onChange={e=>{setAadhaar(e.target.value.replace(/\D/g,"").slice(0,12));setKycVerified(false)}} inputMode="numeric" placeholder="12-digit Aadhaar number" className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm"/><button onClick={verifyKyc} className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-extrabold">{kycVerified?"Verified":"Verify"}</button></div></div>}
+         </div>
+         {error&&<p className="text-xs text-rose-600 mt-2">{error}</p>}
+         <button onClick={finish} className="w-full mt-4 bg-emerald-700 text-white rounded-xl py-3.5 font-extrabold text-sm">Create Account & Enter</button>
+        </>}
+       </div>
+      </div>
+    </div>
+   </div>
+ </div>
+}
+
+
+function BackButton({onBack,label="Back"}){
+  return <button onClick={onBack} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-extrabold text-slate-600 hover:text-emerald-700 hover:border-emerald-200 transition">
+    <ArrowLeft size={15}/>{label}
+  </button>
+}
+
+const trackingData={
+  "KS-10482":{trackingId:"FFRESH-TRK-10482",carrier:"FasalFresh Logistics",vehicle:"CG 04 AB 2187",driver:"Sanjay Kumar",phone:"9876543210",location:"Near city distribution hub",eta:"18 min",updated:"Just now"},
+  "KS-10391":{trackingId:"FFRESH-TRK-10391",carrier:"FasalFresh Logistics",vehicle:"MH 12 CD 4581",driver:"Vijay Patil",phone:"9876543211",location:"Delivered to customer",eta:"Delivered",updated:"Yesterday"},
+  "KS-10276":{trackingId:"FFRESH-TRK-10276",carrier:"FasalFresh Logistics",vehicle:"UP 32 EF 7712",driver:"Rakesh Singh",phone:"9876543212",location:"Delivered to customer",eta:"Delivered",updated:"28 Aug"}
+};
+
+
+// ---- FasalFresh: KYC + AI Demand + Crop Vision + Listing/Shelf-life helpers ----
+const DEMAND_SUGGESTIONS = {
+  Tomato: { demand: "High", trend: "+18%", reason: "Strong local demand and short replenishment cycle.", buyWindow: "Next 2–4 days" },
+  Onion: { demand: "High", trend: "+12%", reason: "Steady household demand with good market movement.", buyWindow: "Next 3–5 days" },
+  Potato: { demand: "Medium", trend: "+6%", reason: "Stable demand; avoid over-listing near peak supply.", buyWindow: "Next 5–7 days" },
+  Mango: { demand: "High", trend: "+22%", reason: "Seasonal demand is strong for fresh-grade fruit.", buyWindow: "Next 1–3 days" },
+  Wheat: { demand: "Medium", trend: "+4%", reason: "Consistent staple demand with moderate price movement.", buyWindow: "Next 7–10 days" },
+  Chana: { demand: "Medium", trend: "+8%", reason: "Stable pulse demand and good shelf stability.", buyWindow: "Next 7–10 days" },
+  "Green Peas": { demand: "High", trend: "+15%", reason: "Fresh produce demand is strong; sell while quality is high.", buyWindow: "Next 1–3 days" },
+  Grapes: { demand: "High", trend: "+11%", reason: "Fresh-fruit demand favors quick turnover.", buyWindow: "Next 2–4 days" }
+};
+
+const SHELF_LIFE_DAYS = { Tomato: 7, Onion: 30, Potato: 21, Mango: 10, Wheat: 180, Chana: 180, "Green Peas": 5, Grapes: 10 };
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d;
+}
+function dateInputValue(d = new Date()) {
+  return new Date(d).toISOString().slice(0,10);
+}
+function daysLeft(date) {
+  return Math.ceil((new Date(date) - new Date()) / 86400000);
+}
+function demandForCrop(crop) {
+  return DEMAND_SUGGESTIONS[crop] || { demand: "Medium", trend: "+5%", reason: "Use recent local sales to tune your listing.", buyWindow: "Next 5–7 days" };
+}
+
+function FarmerKYC() {
+  const [aadhaar, setAadhaar] = React.useState("");
+  const [status, setStatus] = React.useState("Not verified");
+  const [message, setMessage] = React.useState("");
+  const verify = () => {
+    const digits = aadhaar.replace(/\D/g, "");
+    if (digits.length !== 12) { setMessage("Enter a valid 12-digit Aadhaar number."); return; }
+    setStatus("Verified (demo)");
+    setMessage("Aadhaar KYC verified in demo mode. No real government verification is performed by this frontend.");
+  };
+  return <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 mt-5">
+    <div className="flex items-center gap-2 font-bold text-emerald-900"><ShieldCheck size={20}/> Farmer KYC — Aadhaar</div>
+    <p className="text-xs text-emerald-800 mt-1">Demo client-side KYC UI. For production, verify Aadhaar through an authorized provider; never store raw Aadhaar in browser storage.</p>
+    <div className="flex gap-2 mt-3">
+      <input value={aadhaar} onChange={e=>setAadhaar(e.target.value.replace(/\D/g,"").slice(0,12))} placeholder="12-digit Aadhaar" inputMode="numeric" className="flex-1 border rounded-xl px-3 py-2 bg-white"/>
+      <button onClick={verify} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold">Verify</button>
+    </div>
+    <div className="text-sm mt-2 flex items-center gap-2">{status==="Verified (demo)" ? <CheckCircle2 size={16} className="text-emerald-600"/> : <AlertTriangle size={16}/>} {status}</div>
+    {message && <div className="text-xs mt-1 text-slate-600">{message}</div>}
+  </div>
+}
+
+function AIDemandSuggestions({crop}) {
+  const s = demandForCrop(crop);
+  return <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 mt-4">
+    <div className="flex items-center gap-2 font-bold text-violet-900"><Sparkles size={19}/> AI Demand Suggestions</div>
+    <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
+      <div><span className="text-slate-500">Demand</span><div className="font-bold">{s.demand} <span className="text-emerald-600">{s.trend}</span></div></div>
+      <div><span className="text-slate-500">Recommended window</span><div className="font-bold">{s.buyWindow}</div></div>
+    </div>
+    <p className="text-xs text-slate-600 mt-3">{s.reason} Demo prediction based on bundled sample signals.</p>
+  </div>
+}
+
+function CropVisionInspection() {
+  const [file, setFile] = React.useState(null);
+  const [score, setScore] = React.useState(null);
+  const [status, setStatus] = React.useState("Load a crop image for a client-side visual inspection.");
+  const [loading, setLoading] = React.useState(false);
+  const runInspection = async () => {
+    if (!file) return;
+    setLoading(true); setStatus("Loading MobileNet model…");
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; });
+      const model = await mobilenet.load();
+      const predictions = await model.classify(img);
+      // MobileNet is a generic image classifier, not an agricultural disease detector.
+      // Use its confidence only as a demo visual-signal proxy, not a scientific crop-health diagnosis.
+      const confidence = predictions.length ? predictions[0].probability : 0.5;
+      const visualScore = Math.max(35, Math.min(98, Math.round(55 + confidence * 43)));
+      setScore(visualScore);
+      setStatus("Client-side MobileNet inspection complete.");
+    } catch (e) {
+      setStatus("Could not inspect this image. Try a JPG/PNG photo.");
+      setScore(null);
+    } finally { setLoading(false); }
+  };
+  return <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 mt-4">
+    <div className="flex items-center gap-2 font-bold text-sky-900"><Camera size={19}/> AI Crop Health / Freshness</div>
+    <p className="text-xs text-slate-600 mt-1">Runs in the browser with TensorFlow.js + MobileNet. This is a visual proxy score, not a certified disease/freshness test.</p>
+    <div className="flex gap-2 mt-3 items-center">
+      <label className="cursor-pointer px-3 py-2 rounded-xl bg-white border font-semibold text-sm flex items-center gap-2"><Upload size={16}/> Choose image
+        <input type="file" accept="image/*" className="hidden" onChange={e=>setFile(e.target.files?.[0]||null)}/>
+      </label>
+      <button onClick={runInspection} disabled={!file||loading} className="px-4 py-2 rounded-xl bg-sky-600 disabled:opacity-50 text-white font-semibold text-sm">{loading?"Inspecting…":"Inspect crop"}</button>
+    </div>
+    {score !== null && <div className="mt-3 flex items-center gap-4"><div className="text-3xl font-black text-sky-700">{score}/100</div><div><div className="font-bold">Visual quality proxy</div><div className="text-xs text-slate-600">{status}</div></div></div>}
+    {score === null && <div className="text-xs mt-2 text-slate-500">{status}</div>}
+  </div>
+}
+
+function CropListingDetails({crop, price, quantity}) {
+  const [listingDate, setListingDate] = React.useState(dateInputValue());
+  const shelf = SHELF_LIFE_DAYS[crop] || 14;
+  const [shelfDays, setShelfDays] = React.useState(shelf);
+  const expiry = addDays(listingDate, shelfDays);
+  const left = daysLeft(expiry);
+  return <div className="rounded-2xl border bg-white p-4 mt-4">
+    <div className="font-bold flex items-center gap-2"><Clock3 size={18}/> Listing & Shelf-life tracking</div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+      <label className="text-sm">Listing date<input type="date" value={listingDate} onChange={e=>setListingDate(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2"/></label>
+      <label className="text-sm">Shelf-life (days)<input type="number" min="1" value={shelfDays} onChange={e=>setShelfDays(Math.max(1,Number(e.target.value)||1))} className="mt-1 w-full border rounded-xl px-3 py-2"/></label>
+      <div className="rounded-xl bg-slate-50 p-3 text-sm"><div className="text-slate-500">Expected expiry</div><div className="font-bold">{expiry.toLocaleDateString()}</div><div className={left<=2?"text-rose-600":"text-emerald-600"}>{left > 0 ? `${left} days remaining` : "Shelf-life reached"}</div></div>
+    </div>
+    <div className="grid grid-cols-3 gap-3 mt-3 text-sm">
+      <div><span className="text-slate-500">Price/kg</span><div className="font-bold">₹{price || "—"}</div></div>
+      <div><span className="text-slate-500">Available quantity</span><div className="font-bold">{quantity || "—"} kg</div></div>
+      <div><span className="text-slate-500">Crop</span><div className="font-bold">{crop || "—"}</div></div>
+    </div>
+  </div>
+}
+
+function TrackingDetails({order,onClose}){
+  const [copied,setCopied]=useState(false);
+  const t=trackingData[order.id]||{...trackingData["KS-10482"],trackingId:order.trackingId||trackingData["KS-10482"].trackingId};
+  const copyId=async()=>{try{await navigator.clipboard.writeText(t.trackingId);setCopied(true);setTimeout(()=>setCopied(false),1500)}catch(e){}};
+  const statusIndex={"Order placed":0,"Accepted":0,"Packed":1,"Picked up":2,"Out for delivery":3,"Delivered":4};
+  const current=statusIndex[order.status]??0;
+  const steps=["Order placed","Packed by farmer","Picked up","Out for delivery","Delivered"];
+  return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-auto shadow-2xl">
+      <div className="bg-[#102218] text-white p-5 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Delivery tracking</p><h2 className="font-display text-2xl font-extrabold">{order.items}</h2><p className="text-xs text-slate-300 mt-1">Order {order.id}</p></div><button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10"><X/></button></div>
+      <div className="p-5 space-y-5">
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 flex items-center gap-3"><div className="w-11 h-11 rounded-xl bg-emerald-700 text-white grid place-items-center"><TruckIcon size={19}/></div><div className="flex-1"><p className="text-xs text-slate-500">Tracking number</p><p className="font-mono font-extrabold text-emerald-800">{t.trackingId}</p></div><button onClick={copyId} className="px-3 py-2 rounded-xl bg-white border border-emerald-200 text-xs font-bold flex items-center gap-1"><Copy size={13}/>{copied?"Copied":"Copy"}</button></div>
+        <div className="grid sm:grid-cols-2 gap-3"><div className="bg-slate-50 rounded-2xl p-4"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Carrier</p><p className="text-sm font-bold mt-1">{t.carrier}</p><p className="text-xs text-slate-500 mt-1">Vehicle: {t.vehicle}</p></div><div className="bg-slate-50 rounded-2xl p-4"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Delivery contact</p><p className="text-sm font-bold mt-1">{t.driver}</p><p className="text-xs text-slate-500 mt-1">+91 {t.phone}</p></div></div>
+        <div className="rounded-2xl border border-slate-100 p-4"><div className="flex items-center justify-between"><p className="font-bold text-sm">Live status</p><span className="text-xs font-extrabold text-emerald-700">{t.eta}</span></div><p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><LocateFixed size={13}/>{t.location}</p><div className="grid grid-cols-5 gap-2 mt-5">{steps.map((s,i)=><div key={s} className="text-center"><div className={"w-8 h-8 rounded-full mx-auto grid place-items-center text-xs font-bold "+(i<=current?"bg-emerald-700 text-white":"bg-slate-100 text-slate-400")}>{i<current?"✓":i+1}</div><p className={"text-[9px] mt-2 "+(i<=current?"text-slate-700 font-bold":"text-slate-400")}>{s}</p></div>)}</div></div>
+        <p className="text-[10px] text-slate-400">Last updated: {t.updated}. Tracking details are demo data in this frontend.</p>
+      </div>
+    </div>
+  </div>
+}
+
+function AppHeader({role,onBack,user}){
+ return <header className="sticky top-0 z-30 glass border-b border-slate-200/80">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+   <button onClick={onBack}><Brand/></button>
+   <div className="flex items-center gap-3">
+
+    <div className="hidden sm:flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 text-xs font-bold text-slate-600"><MapPin size={14} className="text-emerald-700"/> Near you</div>
+    <div className="flex items-center gap-2">
+     <div className="hidden sm:block text-right"><p className="text-[10px] text-slate-400 uppercase tracking-wider">{role==="farmer"?"Farmer":"Consumer"}</p><p className="text-xs font-extrabold text-slate-700">{user?.name||"User"}</p></div>
+     <div className={"w-10 h-10 rounded-xl grid place-items-center text-white font-bold "+(role==="farmer"?"bg-emerald-700":"bg-amber-500")}>{(user?.name||"User").charAt(0).toUpperCase()}</div>
+    </div>
+   </div>
+  </div>
+ </header>
+}
+
+function Consumer({user,filtered,query,setQuery,cat,setCat,addToCart,updateCartQty,removeFromCart,cart,total,onCheckout,onBack,tab,setTab,orders,notifications,setNotifications}){
+ const [priceOpen,setPriceOpen]=useState(false);
+ const [priceCrop,setPriceCrop]=useState("Tomato");
+ const [priceQty,setPriceQty]=useState(20);
+ const [priceMode,setPriceMode]=useState("buy");
+ const [wallet,setWallet]=useState(1850);
+ const priceBase=crops.find(x=>x.name===priceCrop)?.price||25;
+ const aiPrice=Math.round(priceBase*(priceMode==="buy"?1.08:.92));
+ const [city,setCity]=useState("Pune");
+
+ return <div className="min-h-screen bg-[#f6f8f5]">
+  <AppHeader role="consumer" user={user} onBack={onBack}/>
+  <TopBar/>
+  <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+   <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+    <div><p className="text-xs uppercase tracking-[.18em] text-emerald-700 font-extrabold">Consumer marketplace</p><h1 className="font-display text-4xl font-extrabold mt-1">Hi {user?.name||"there"} 👋</h1><p className="text-sm text-slate-500 mt-2">{tab==="market"?"Fresh produce, near you.":"Your "+(tab==="orders"?"orders":"wallet")+" — all in one place."}</p></div>
+    {tab==="market"&&<div className="flex items-center gap-3"><NotificationBell notifications={notifications} setNotifications={setNotifications} role="consumer"/><div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center gap-3 min-w-[280px]"><Search size={18} className="text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tomatoes, mangoes..." className="outline-none w-full text-sm bg-transparent"/></div></div>}
+   </div>
+
+   <div className="flex gap-2 overflow-auto no-scrollbar mt-7 pb-1">
+    {[["market","Marketplace"],["orders","My Orders"],["wallet","Wallet & Payments"]].map(([k,v])=><button key={k} onClick={()=>setTab(k)} className={"px-4 py-2.5 rounded-xl text-xs font-extrabold border whitespace-nowrap "+(tab===k?"bg-slate-900 text-white border-slate-900":"bg-white text-slate-600 border-slate-200")}>{v}</button>)}
+   </div>
+
+   {tab==="market"&&<>
+    <div className="flex gap-2 overflow-auto no-scrollbar mt-4 pb-1">{categories.map(c=><button key={c} onClick={()=>setCat(c)} className={"px-4 py-2 rounded-full text-xs font-bold border whitespace-nowrap "+(cat===c?"bg-emerald-700 text-white border-emerald-700":"bg-white text-slate-600 border-slate-200")}>{c}</button>)}</div>
+    <div className="grid lg:grid-cols-[1fr_320px] gap-7 mt-6">
+     <section>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{filtered.map((it,i)=><ProductCard key={it.farmer.id+"-"+it.id} item={it} add={()=>addToCart(it)} i={i}/>)}</div>
+     </section>
+     <aside className="lg:sticky lg:top-28 h-fit space-y-4">
+      <div className="bg-[#102218] text-white rounded-3xl p-5 shadow-xl">
+       <div className="flex items-center justify-between">
+        <div><p className="text-xs text-emerald-300 font-bold uppercase tracking-wider">Your basket</p><p className="font-display text-2xl font-extrabold mt-1">{cart.reduce((n,x)=>n+x.count,0)} item{cart.reduce((n,x)=>n+x.count,0)!==1?"s":""}</p></div>
+        <div className="w-11 h-11 rounded-2xl bg-white/10 grid place-items-center"><ShoppingBasket/></div>
+       </div>
+       {cart.length>0 ? <div className="border-t border-white/10 mt-5 pt-4 space-y-3 max-h-64 overflow-auto pr-1">
+        {cart.map(x=><div key={x.key} className="rounded-2xl bg-white/5 border border-white/10 p-3">
+         <div className="flex items-center gap-2">
+          <span className="text-xl">{x.emoji}</span>
+          <div className="flex-1 min-w-0"><p className="text-sm font-bold truncate">{x.name}</p><p className="text-[10px] text-slate-400">{x.farmer.name} • {money(x.price)}/kg</p></div>
+          <button onClick={()=>removeFromCart(x.key)} title="Remove from basket" className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 grid place-items-center"><Trash2 size={15}/></button>
+         </div>
+         <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-1">
+           <button onClick={()=>updateCartQty(x.key,-1)} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"><Minus size={13}/></button>
+           <span className="w-10 text-center text-xs font-bold">{x.count} kg</span>
+           <button onClick={()=>updateCartQty(x.key,1)} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center"><Plus size={13}/></button>
+          </div>
+          <span className="font-mono text-sm font-bold">{money(x.price*x.count)}</span>
+         </div>
+        </div>)}
+       </div> : <div className="border-t border-white/10 mt-5 pt-5 text-center text-xs text-slate-400">Your basket is empty.<br/>Add fresh produce to continue.</div>}
+       <div className="border-t border-white/10 mt-5 pt-4 flex justify-between"><span className="text-xs text-slate-300">Total</span><span className="font-mono font-bold">{money(total)}</span></div>
+       <button disabled={!cart.length} onClick={onCheckout} className="w-full mt-4 bg-amber-400 disabled:opacity-40 text-slate-950 rounded-xl py-3 font-extrabold text-sm">Checkout</button>
+      </div>
+      <button onClick={()=>setPriceOpen(true)} className="w-full bg-white border border-emerald-100 rounded-3xl p-5 text-left hover:shadow-soft transition"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-emerald-50 grid place-items-center"><BarChart3 size={19} className="text-emerald-700"/></div><div><p className="font-bold text-sm">AI Price Calculator</p><p className="text-[11px] text-slate-500 mt-1">Estimate a fair buying price using live mandi signals.</p></div><ChevronRight className="ml-auto"/></div></button>
+      <div className="bg-white border border-slate-100 rounded-3xl p-5"><div className="flex items-center gap-2"><Sun size={18} className="text-amber-500"/><p className="font-bold text-sm">Weather & Crop Advisory</p></div><select value={city} onChange={e=>setCity(e.target.value)} className="mt-3 w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs"><option>{city}</option>{allCities.filter(x=>x!==city).slice(0,25).map(x=><option key={x}>{x}</option>)}</select><div className="mt-3 grid grid-cols-2 gap-2"><div className="bg-sky-50 rounded-xl p-3"><p className="font-mono font-bold">29°C</p><p className="text-[9px] text-slate-500">Partly cloudy</p></div><div className="bg-emerald-50 rounded-xl p-3"><p className="font-bold text-xs">Good</p><p className="text-[9px] text-slate-500">Harvest window</p></div></div><p className="text-[10px] text-slate-500 mt-3">Advisory: keep harvested vegetables shaded and schedule delivery before peak afternoon heat.</p></div>
+     </aside>
+    </div>
+   </>}
+
+   {tab==="orders"&&<Orders orders={orders}/>}
+   {tab==="wallet"&&<Wallet balance={wallet} addMoney={()=>setWallet(w=>w+500)}/>}
+  </main>
+  {priceOpen&&<PriceCalculator crop={priceCrop} setCrop={setPriceCrop} qty={priceQty} setQty={setPriceQty} mode={priceMode} setMode={setPriceMode} base={priceBase} estimate={aiPrice} close={()=>setPriceOpen(false)}/>}
+ </div>
+}
+
+function NotificationBell({notifications,setNotifications,role}){
+  const [open,setOpen]=useState(false);
+  const visible=notifications.filter(n=>n.roles.includes(role));
+  const unread=visible.filter(n=>!n.read).length;
+  return <div className="relative"><button onClick={()=>{setOpen(v=>!v);setNotifications(ns=>ns.map(n=>n.roles.includes(role)?{...n,read:true}:n))}} className="relative w-10 h-10 rounded-xl bg-white border border-slate-200 grid place-items-center hover:border-emerald-300"><span className="text-lg">🔔</span>{unread>0&&<span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black grid place-items-center">{unread>9?"9+":unread}</span>}</button>{open&&<div className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"><div className="p-4 border-b border-slate-100 flex justify-between"><p className="font-bold text-sm">Notifications</p><span className="text-[10px] text-slate-400">Delivery updates</span></div><div className="max-h-80 overflow-auto">{visible.length?<>{visible.map(n=><div key={n.id} className="p-3 border-b border-slate-50 flex gap-3"><div className="w-8 h-8 rounded-full bg-emerald-50 grid place-items-center">🔔</div><div><p className="text-xs font-bold">{n.text}</p>{n.orderId&&<p className="text-[10px] text-slate-400 mt-1">Order {n.orderId}</p>}</div></div>)}</>:<div className="p-6 text-center text-xs text-slate-400">No notifications yet</div>}</div></div>}</div>
+}
+
+function Orders({orders}){
+  const [selected,setSelected]=useState(null);
+  return <div className="mt-7 max-w-4xl space-y-4">
+    {orders.map(o=><div key={o.id} className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 sm:items-center"><div className="w-12 h-12 rounded-2xl bg-emerald-50 grid place-items-center"><PackageCheck className="text-emerald-700"/></div>
+      <div className="flex-1"><p className="font-bold">{o.items}</p><p className="text-xs text-slate-400 mt-1">Order {o.id} • {o.date}</p><p className="text-[10px] text-emerald-700 font-mono mt-1">Tracking: {trackingData[o.id]?.trackingId||o.trackingId||"Generating…"}</p></div>
+      <div className="text-left sm:text-right"><p className="font-mono font-bold">{money(o.amount)}</p><p className="text-xs text-emerald-700 font-bold mt-1">{o.status}</p></div></div>
+      <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={"h-full rounded-full "+(o.status==="Delivered"?"w-full bg-emerald-600":"w-3/4 bg-amber-400")}/></div>
+      <div className="flex justify-between mt-2 text-[10px] text-slate-400"><span>Confirmed</span><span>Packed</span><span>Shipped</span><span>{o.eta}</span></div>
+      <button onClick={()=>setSelected(o)} className="mt-4 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-extrabold flex items-center gap-2"><LocateFixed size={14}/> Track delivery</button>
+    </div>)}
+    {selected&&<TrackingDetails order={selected} onClose={()=>setSelected(null)}/>}
+  </div>
+}
+function Wallet({balance,addMoney}){
+ return <div className="mt-7 grid md:grid-cols-[1fr_1fr] gap-5"><div className="bg-[#102218] rounded-3xl p-6 text-white"><p className="text-xs text-emerald-300 uppercase tracking-widest font-bold">FasalFresh Wallet</p><p className="font-display text-4xl font-extrabold mt-3">{money(balance)}</p><p className="text-xs text-slate-400 mt-1">Available balance</p><button onClick={addMoney} className="mt-6 bg-amber-400 text-slate-950 rounded-xl px-4 py-3 text-xs font-extrabold">+ Add ₹500</button></div><div className="bg-white rounded-3xl border border-slate-100 p-6"><p className="font-bold">Payment status</p><div className="space-y-3 mt-4">{[["KS-10482","UPI","Paid","text-emerald-700"],["KS-10391","Wallet","Paid","text-emerald-700"],["KS-10276","Cash on delivery","Completed","text-slate-500"]].map(x=><div key={x[0]} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50"><CheckCircle2 size={16} className={x[3]}/><div className="flex-1"><p className="text-xs font-bold">{x[0]}</p><p className="text-[10px] text-slate-400">{x[1]}</p></div><span className={"text-[10px] font-extrabold "+x[3]}>{x[2]}</span></div>)}</div></div></div>
+}
+function PriceCalculator({crop,setCrop,qty,setQty,mode,setMode,base,estimate,close}){
+ return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4"><div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl"><div className="flex justify-between"><div><p className="text-xs uppercase tracking-widest text-emerald-700 font-bold">AI pricing</p><h2 className="font-display text-2xl font-extrabold">Fair Price Calculator</h2></div><button onClick={close}><X/></button></div><div className="grid grid-cols-2 gap-2 mt-5 bg-slate-100 p-1 rounded-xl"><button onClick={()=>setMode("buy")} className={"rounded-lg py-2 text-xs font-bold "+(mode==="buy"?"bg-white shadow":"text-slate-500")}>Buying estimate</button><button onClick={()=>setMode("sell")} className={"rounded-lg py-2 text-xs font-bold "+(mode==="sell"?"bg-white shadow":"text-slate-500")}>Selling estimate</button></div><div className="grid sm:grid-cols-2 gap-3 mt-5"><select value={crop} onChange={e=>setCrop(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm">{crops.map(c=><option key={c.name}>{c.name}</option>)}</select><input type="number" min="1" value={qty} onChange={e=>setQty(+e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm" placeholder="Quantity kg"/></div><div className="bg-emerald-50 rounded-2xl p-5 mt-5"><p className="text-xs text-emerald-700 font-bold">AI estimated fair price</p><p className="font-mono text-4xl font-extrabold text-emerald-800 mt-1">{money(estimate)} <span className="text-sm">/ kg</span></p><p className="text-xs text-slate-500 mt-2">Estimated total for {qty} kg: <b>{money(estimate*qty)}</b></p></div><p className="text-[10px] text-slate-400 mt-4">Demo estimate based on marketplace price signals, distance and direction of demand. Connect a live mandi/AI backend for production accuracy.</p></div></div>
+}
+
+function FreshnessReview({item,onClose}){
+ const [photo,setPhoto]=useState(null);
+ const [score,setScore]=useState(85);
+ const [note,setNote]=useState("");
+ const [submitted,setSubmitted]=useState(false);
+ const onPhoto=e=>{const f=e.target.files?.[0]; if(f)setPhoto(URL.createObjectURL(f));};
+ return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4">
+  <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden">
+   <div className="bg-[#102218] text-white p-5 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Consumer freshness check</p><h2 className="font-display text-2xl font-extrabold mt-1">Rate {item.name} freshness</h2></div><button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10"><X/></button></div>
+   {submitted?<div className="p-8 text-center"><div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center mx-auto"><CheckCircle2 size={34}/></div><h3 className="font-display text-2xl font-extrabold mt-5">Thanks for your feedback!</h3><p className="text-sm text-slate-500 mt-2">Your freshness score helps other consumers choose better produce.</p><div className="mt-5 font-mono text-4xl font-black text-emerald-700">{score}/100</div><button onClick={onClose} className="mt-6 w-full bg-emerald-700 text-white rounded-xl py-3 font-extrabold">Done</button></div>:
+   <div className="p-5 space-y-5">
+    <div className="rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 p-4">
+     {photo?<img src={photo} alt="Uploaded crop" className="w-full h-48 object-cover rounded-2xl"/>:<div className="h-48 rounded-2xl bg-white grid place-items-center text-center"><div><Camera size={34} className="mx-auto text-emerald-600"/><p className="font-bold mt-2">Upload a fresh crop photo</p><p className="text-[11px] text-slate-500 mt-1">JPG or PNG • Clear close-up works best</p></div></div>}
+     <label className="mt-3 cursor-pointer w-full bg-white border border-emerald-200 rounded-xl py-3 font-extrabold text-sm flex justify-center items-center gap-2"><Upload size={16}/> {photo?"Change photo":"Choose photo"}<input type="file" accept="image/*" className="hidden" onChange={onPhoto}/></label>
+    </div>
+    <div><div className="flex items-center justify-between"><label className="text-sm font-bold">Freshness score</label><span className="font-mono text-xl font-black text-emerald-700">{score}/100</span></div><input type="range" min="1" max="100" value={score} onChange={e=>setScore(+e.target.value)} className="w-full mt-3 accent-emerald-700"/><div className="flex justify-between text-[10px] text-slate-400"><span>Not fresh</span><span>Very fresh</span></div></div>
+    <textarea value={note} onChange={e=>setNote(e.target.value)} rows="3" placeholder="Optional: mention colour, firmness, smell, etc." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-emerald-500 resize-none"/>
+    <button disabled={!photo} onClick={()=>setSubmitted(true)} className="w-full bg-emerald-700 disabled:opacity-40 text-white rounded-xl py-3.5 font-extrabold">Submit freshness review</button>
+    <p className="text-[10px] text-slate-400 text-center">Consumer scores are community feedback and are not a laboratory freshness test.</p>
+   </div>}
+  </div>
+ </div>
+}
+
+function ProductCard({item,add,i}){
+ const [reviewOpen,setReviewOpen]=useState(false);
+ const shelf=SHELF_LIFE_DAYS[item.name]||14;
+ const listingDate=item.listingDate||dateInputValue();
+ const expiry=addDays(listingDate,shelf);
+ const left=daysLeft(expiry);
+ return <div className="fade-up bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-soft hover:-translate-y-0.5 transition" style={{animationDelay:(i*60)+"ms"}}>
+  <div className="h-36 bg-gradient-to-br from-emerald-50 to-amber-50 grid place-items-center relative">{item.photo?<img src={item.photo} alt={item.name} className="w-full h-full object-cover"/>:<span className="text-6xl">{item.emoji}</span>}<div className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full px-2 py-1 text-[10px] font-extrabold text-emerald-700">FRESH</div></div>
+  <div className="p-4">
+   <div className="flex justify-between gap-3"><div><h3 className="font-display text-xl font-bold">{item.name}</h3><p className="text-[11px] text-slate-500 mt-0.5">{item.farmer.city} • {item.qty} kg available</p></div><div className="text-right"><p className="font-mono font-bold text-emerald-700">{money(item.price)}</p><p className="text-[9px] text-slate-400">per kg</p></div></div>
+   <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-500 flex-wrap"><span className="flex items-center gap-1"><Star size={12} fill="currentColor" className="text-amber-400"/> {item.farmer.rating}</span><span>•</span><span className="flex items-center gap-1"><Truck size={12}/> ~30 min</span><span>•</span><span className="flex items-center gap-1 text-emerald-700"><ShieldCheck size={12}/> Verified</span></div>
+   <div className="mt-3 rounded-xl bg-slate-50 p-3 text-[10px]"><div className="flex justify-between"><span className="text-slate-500 flex items-center gap-1"><Clock size={12}/> Listed {new Date(listingDate).toLocaleDateString()}</span><span className={left<=2?"text-rose-600 font-bold":"text-emerald-700 font-bold"}>{left>0?`${left} days shelf-life left`:"Shelf-life reached"}</span></div></div>
+   <div className="mt-4 flex items-center justify-between gap-2"><div className="flex -space-x-2"><div className="w-7 h-7 rounded-full bg-emerald-100 border-2 border-white grid place-items-center text-[9px] font-bold text-emerald-800">{item.farmer.avatar}</div><span className="text-[10px] text-slate-500 ml-2 self-center">{item.farmer.name}</span></div><button onClick={()=>setReviewOpen(true)} className="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 text-[10px] font-extrabold flex items-center gap-1"><Camera size={13}/> Rate freshness</button></div>
+   <button onClick={add} className="w-full mt-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl px-3 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1"><Plus size={14}/> Add to basket</button>
+  </div>
+  {reviewOpen&&<FreshnessReview item={item} onClose={()=>setReviewOpen(false)}/>}
+ </div>
+}
+
+function Farmer({user,onBack,onLogout,tab,setTab,sharedListings,setSharedListings,orders,setOrders,notifications,setNotifications}){
+ const farmerId=user?.phone||"farmer-demo";
+  const [list,setList]=useState(()=>{
+    try{
+      const saved=JSON.parse(localStorage.getItem("fasalfresh_farmer_listings_"+farmerId)||"[]");
+      if(Array.isArray(saved)) return saved;
+    }catch(e){}
+    return [];
+  });
+ const [crop,setCrop]=useState("Tomato"),[qty,setQty]=useState(""),[price,setPrice]=useState("");
+ const [listingDate,setListingDate]=useState(dateInputValue());
+ const [shelfDays,setShelfDays]=useState(SHELF_LIFE_DAYS["Tomato"]||14);
+ const [balance,setBalance]=useState(12480);
+ const [photo,setPhoto]=useState(null);
+ const add=()=>{if(!qty||Number(qty)<=0||!price||Number(price)<=0){alert("Please enter a valid quantity and price.");return}const item={id:Date.now(),name:crop,cat:crops.find(x=>x.name===crop)?.cat||"Vegetable",emoji:crops.find(x=>x.name===crop)?.emoji||"🌱",qty:+qty,price:+price,listingDate,shelfDays,photo};setList(l=>[...l,item]);setSharedListings(l=>[...l,{...item,farmer:{
+  ...(farmers[0]||{}),
+  id:farmerId,
+  name:user?.name||"Farmer",
+  city:user?.city||farmers[0]?.city||"India",
+  avatar:(user?.name||"F").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase(),
+  rating:farmers[0]?.rating||4.8
+}}]);setQty("");setPrice("");setPhoto(null)};
+ return <div className="min-h-screen bg-[#f6f8f5]">
+  <AppHeader role="farmer" user={user} onBack={onBack}/><TopBar/>
+  <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+   <div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-[.18em] text-emerald-700 font-extrabold">Farmer dashboard</p><h1 className="font-display text-4xl font-extrabold mt-1">Good morning, {user?.name||"Farmer"} 👋</h1><p className="text-sm text-slate-500 mt-2">Sell smarter, track every order and get crop signals.</p></div><div className="flex items-center gap-3"><NotificationBell notifications={notifications} setNotifications={setNotifications} role="farmer"/><button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-rose-600"><LogOut size={15}/> Exit</button></div></div>
+   <div className="flex gap-2 overflow-auto no-scrollbar mt-7">{[["overview","Overview"],["sales","My Sales"],["wallet","Wallet & Payments"],["advisory","Weather & Advisory"]].map(([k,v])=><button key={k} onClick={()=>setTab(k)} className={"px-4 py-2.5 rounded-xl text-xs font-extrabold border whitespace-nowrap "+(tab===k?"bg-slate-900 text-white border-slate-900":"bg-white text-slate-600 border-slate-200")}>{v}</button>)}</div>
+   {tab==="overview"&&<div className="grid lg:grid-cols-[1fr_320px] gap-7 mt-7"><section><div className="grid sm:grid-cols-3 gap-3">{[[BarChart3,money(balance),"Potential sales"],[PackageCheck,String(list.length),"Active listings"],[Star,"4.8","Farmer rating"]].map(([I,v,l],i)=><div key={i} className="bg-white rounded-2xl border border-slate-100 p-4"><I size={18} className="text-emerald-700"/><p className="font-display text-2xl font-extrabold mt-2">{v}</p><p className="text-[10px] text-slate-500">{l}</p></div>)}</div><div className="mt-8 flex items-center justify-between"><h2 className="font-display text-2xl font-bold">Your listings</h2><span className="text-xs text-slate-400">{list.length} active</span></div><div className="space-y-3 mt-3">{list.map((x,i)=><div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-emerald-50 grid place-items-center text-2xl overflow-hidden">{x.photo?<img src={x.photo} alt={x.name} className="w-full h-full object-cover"/>:x.emoji}</div><div className="flex-1"><p className="font-bold text-sm">{x.name}</p><p className="text-xs text-slate-500 mt-1">{x.qty} kg available • Listed {new Date(x.listingDate||dateInputValue()).toLocaleDateString()}</p><p className="text-[10px] text-emerald-700 mt-1">Shelf-life: {x.shelfDays||SHELF_LIFE_DAYS[x.name]||14} days</p></div><div className="text-right"><p className="font-mono font-bold text-emerald-700">{money(x.price)}</p><p className="text-[9px] text-slate-400">/kg</p></div><button onClick={()=>{
+  const itemToRemove=list[i];
+  setList(l=>l.filter((_,j)=>j!==i));
+  if(itemToRemove?.id)setSharedListings(l=>l.filter(x=>x.id!==itemToRemove.id));
+}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>)}</div></section><aside className="space-y-4"><div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm"><div className="flex items-center gap-2"><Plus size={17} className="text-emerald-700"/><h2 className="font-bold">Add produce</h2></div><div className="space-y-3 mt-4"><select value={crop} onChange={e=>{const v=e.target.value;setCrop(v);setShelfDays(SHELF_LIFE_DAYS[v]||14)}} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm">{crops.map(c=><option key={c.name}>{c.name}</option>)}</select><div className="grid grid-cols-2 gap-2"><input value={qty} onChange={e=>setQty(e.target.value.replace(/\D/g,""))} placeholder="Quantity kg" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none"/><input value={price} onChange={e=>setPrice(e.target.value.replace(/\D/g,""))} placeholder="Price / kg" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none"/></div><label className="mt-3 cursor-pointer rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 p-3 flex items-center gap-3">{photo?<img src={photo} alt="Crop preview" className="w-16 h-16 rounded-xl object-cover"/>:<div className="w-16 h-16 rounded-xl bg-white grid place-items-center"><Camera size={22} className="text-emerald-600"/></div>}<div><p className="text-xs font-extrabold text-emerald-900">{photo?"Change product photo":"Upload product photo"}</p><p className="text-[10px] text-slate-500 mt-1">This photo will appear in the marketplace</p></div><input type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f)setPhoto(URL.createObjectURL(f))}}/></label><div className="grid grid-cols-2 gap-2"><label className="text-[11px] font-bold text-slate-600">Date of listing<input type="date" value={listingDate} onChange={e=>setListingDate(e.target.value)} className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm font-normal"/></label><label className="text-[11px] font-bold text-slate-600">Shelf life (days)<input type="number" min="1" value={shelfDays} onChange={e=>setShelfDays(Math.max(1,Number(e.target.value)||1))} className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm font-normal"/></label></div><div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+<div className="flex items-center gap-2"><BarChart3 size={16} className="text-emerald-700"/><p className="text-xs font-extrabold text-emerald-900">AI Price Predictor (Client-side demo)</p></div>
+<p className="text-[10px] text-slate-500 mt-1">Suggested fair selling price while you list this crop.</p>
+<div className="flex items-end justify-between mt-3"><div><p className="text-[9px] text-slate-400">AI suggested price</p><p className="font-mono text-2xl font-extrabold text-emerald-800">₹{Math.round((crops.find(x=>x.name===crop)?.price||25)*1.08)}/kg</p></div>
+<button type="button" onClick={()=>setPrice(String(Math.round((crops.find(x=>x.name===crop)?.price||25)*1.08)))} className="px-3 py-2 rounded-xl bg-white border border-emerald-200 text-[10px] font-extrabold text-emerald-700">Use AI price</button></div>
+</div>
+<div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-[10px] text-slate-600"><b>Expiry preview:</b> {addDays(listingDate,shelfDays).toLocaleDateString()} • {Math.max(0,daysLeft(addDays(listingDate,shelfDays)))} days remaining</div><button onClick={add} className="w-full bg-emerald-700 text-white rounded-xl py-3 font-extrabold text-sm">Publish listing</button></div></div><Advisory/></aside></div>}
+   {tab==="sales"&&<Sales orders={orders} setOrders={setOrders} notifications={notifications} setNotifications={setNotifications} farmerId={farmerId}/>}
+   {tab==="wallet"&&<Wallet balance={balance} addMoney={()=>setBalance(b=>b+500)}/>}
+   {tab==="advisory"&&<div className="mt-7 max-w-2xl"><Advisory large/></div>}
+  </main>
+ </div>
+}
+function Sales({orders,setOrders,setNotifications,farmerId}){
+ const farmerOrders=orders.filter(o=>String(o.farmerId)===String(farmerId));
+ const update=(o,status,eta)=>{setOrders(all=>all.map(x=>x.id===o.id?{...x,status,eta}:x));setNotifications(n=>[{id:Date.now()+Math.random(),text:`Order ${o.id}: ${status}`,orderId:o.id,roles:["consumer","farmer"],read:false},...n].slice(0,30))};
+ return <div className="mt-7 bg-white rounded-3xl border border-slate-100 overflow-hidden"><div className="p-5 border-b border-slate-100"><p className="text-xs uppercase tracking-widest text-emerald-700 font-bold">Farmer revenue</p><h2 className="font-display text-2xl font-extrabold mt-1">My Sales</h2></div><div className="divide-y divide-slate-100">{farmerOrders.length===0&&<div className="p-8 text-center text-xs text-slate-400">No sales yet. Orders for your listed produce will appear here.</div>}{farmerOrders.map(s=><div key={s.id} className="p-5 flex flex-col sm:flex-row sm:items-center gap-4"><div className="w-11 h-11 rounded-xl bg-emerald-50 grid place-items-center"><PackageCheck size={18} className="text-emerald-700"/></div><div className="flex-1"><p className="text-sm font-bold">{s.items}</p><p className="text-xs text-slate-400 mt-1">{s.id} • Buyer order</p><p className="text-[9px] text-slate-400 font-mono mt-1">Tracking: {s.trackingId||"—"}</p></div><div className="text-left sm:text-right"><p className="font-mono font-bold">{money(s.amount)}</p><p className="text-[10px] text-emerald-700 font-bold mt-1">{s.status}</p><div className="flex gap-2 mt-2 justify-end"><button onClick={()=>update(s,"Accepted","Preparing")} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[9px] font-bold">Accept</button><button onClick={()=>update(s,"Packed","Ready for pickup")} className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 text-[9px] font-bold">Packed</button><button onClick={()=>update(s,"Out for delivery","On the way")} className="px-2 py-1 rounded-lg bg-slate-900 text-white text-[9px] font-bold">Dispatch</button><button onClick={()=>update(s,"Delivered","Delivered")} className="px-2 py-1 rounded-lg bg-emerald-700 text-white text-[9px] font-bold">Delivered</button></div></div></div>)}</div></div>
+}
+function Advisory({large=false}){
+ return <div className={"bg-white border border-slate-100 rounded-3xl p-5 "+(large?"shadow-sm":"")}><div className="flex items-center gap-2"><Sun size={18} className="text-amber-500"/><p className="font-bold">Weather & Crop Advisory</p></div><div className="grid grid-cols-2 gap-3 mt-4"><div className="bg-sky-50 rounded-2xl p-4"><p className="text-xs text-slate-500">Next 24h</p><p className="font-mono text-2xl font-bold mt-1">29°C</p><p className="text-[10px] text-slate-500 mt-1">Partly cloudy • Rain 20%</p></div><div className="bg-emerald-50 rounded-2xl p-4"><p className="text-xs text-slate-500">Field signal</p><p className="font-bold mt-1">Good</p><p className="text-[10px] text-slate-500 mt-1">Harvest & transport window</p></div></div><div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-100"><p className="text-xs font-bold text-amber-900">AI crop advisory</p><p className="text-xs text-slate-600 leading-5 mt-1">Keep harvested produce shaded, avoid unnecessary moisture, and schedule dispatch during cooler hours.</p></div></div>
+}
+
+function Checkout({cart,total,close,done}){
+ const [step,setStep]=useState(1);
+ return <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5">
+  <div className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl overflow-hidden shadow-2xl">
+   <div className="bg-[#102218] text-white px-5 py-4 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">Secure checkout</p><h2 className="font-display text-xl font-bold">Complete your order</h2></div>{step<3&&<button onClick={close}><X/></button>}</div>
+   {step===1&&<div className="p-5"><div className="space-y-3">{cart.map(x=><div key={x.key} className="flex items-center gap-3"><span className="text-2xl">{x.emoji}</span><div className="flex-1"><p className="text-sm font-bold">{x.name}</p><p className="text-xs text-slate-500">{x.farmer.name} • {x.count} kg</p></div><span className="font-mono text-sm font-bold">{money(x.price*x.count)}</span></div>)}</div><div className="border-t border-slate-100 mt-5 pt-4 flex justify-between"><span className="text-sm text-slate-500">Order total</span><span className="font-mono font-extrabold text-lg">{money(total+30)}</span></div><button onClick={()=>setStep(2)} className="w-full mt-5 bg-emerald-700 text-white rounded-xl py-3.5 font-extrabold">Continue to payment</button></div>}
+   {step===2&&<div className="p-5"><p className="text-sm font-bold">Payment method</p><div className="grid gap-3 mt-4"><button onClick={()=>setStep(3)} className="border-2 border-emerald-700 bg-emerald-50 rounded-2xl p-4 text-left flex items-center gap-3"><WalletCards className="text-emerald-700"/><div><p className="text-sm font-bold">UPI / Card</p><p className="text-xs text-slate-500">Secure demo payment</p></div><ChevronRight className="ml-auto"/></button><button onClick={()=>setStep(3)} className="border border-slate-200 rounded-2xl p-4 text-left flex items-center gap-3"><IndianRupee/><div><p className="text-sm font-bold">Cash on delivery</p><p className="text-xs text-slate-500">Pay when your order arrives</p></div><ChevronRight className="ml-auto"/></button></div></div>}
+   {step===3&&<div className="p-8 text-center"><div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center mx-auto"><CheckCircle2 size={34}/></div><h3 className="font-display text-2xl font-extrabold mt-5">Order placed!</h3><p className="text-sm text-slate-500 mt-2">Your farmers have been notified. Delivery updates will appear shortly.</p><div className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-100 p-3"><p className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Delivery tracking number</p><p className="font-mono font-extrabold text-emerald-900 mt-1">FFRESH-TRK-{String(Math.floor(10000+Math.random()*89999))}</p></div><button onClick={done} className="mt-6 w-full bg-emerald-700 text-white rounded-xl py-3 font-extrabold">Back to marketplace</button></div>}
+  </div>
+ </div>
+}
+
+createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
